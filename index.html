@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>RVS Peinture — Fiche de demande chantier</title>
+
+<!-- PWA : installation sur l'écran d'accueil et usage hors-ligne -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#1c2530">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RVS Chantier">
+<style>
+  /* ============================================================
+     RVS PEINTURE — Fiche de demande ou modification chantier
+     Application autonome, hors-ligne, sans dépendance externe.
+     Toutes les données sont stockées dans le localStorage du
+     navigateur de l'appareil utilisé.
+     ============================================================ */
+
+  :root{
+    --brand-dark:#1c2530;
+    --brand-mid:#2b3648;
+    --brand-line:#3a4658;
+    --bg:#f3f4f6;
+    --card:#ffffff;
+    --text:#1c2530;
+    --text-muted:#6b7280;
+    --border:#dfe2e7;
+    --accent:#2b6cb0;
+    --accent-dark:#1e4e85;
+
+    --vert:#2f8f4e;
+    --vert-bg:#e7f6ec;
+    --orange:#d97e18;
+    --orange-bg:#fdf0dd;
+    --rouge:#c93636;
+    --rouge-bg:#fbe6e6;
+    --gris:#6b7280;
+    --gris-bg:#eceef1;
+
+    --radius:12px;
+    --shadow:0 1px 3px rgba(28,37,48,0.08), 0 1px 2px rgba(28,37,48,0.06);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    line-height:1.45;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:0 0 90px 0;}
+
+  /* ---------- Header ---------- */
+  header.app-header{
+    background:var(--brand-dark);
+    color:#fff;
+    padding:22px 18px 18px;
+    position:sticky;
+    top:0;
+    z-index:20;
+    box-shadow:var(--shadow);
+  }
+  header.app-header h1{
+    margin:0;
+    font-size:1.35rem;
+    letter-spacing:0.02em;
+    font-weight:800;
+  }
+  header.app-header h2{
+    margin:2px 0 0;
+    font-size:0.98rem;
+    font-weight:500;
+    color:#c7ccd6;
+  }
+  header.app-header p.tagline{
+    margin:10px 0 0;
+    font-size:0.85rem;
+    font-style:italic;
+    color:#9aa4b5;
+    border-left:3px solid var(--accent);
+    padding-left:8px;
+  }
+
+  /* ---------- Bottom nav ---------- */
+  nav.tabbar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    display:flex;
+    background:#fff;
+    border-top:1px solid var(--border);
+    box-shadow:0 -2px 8px rgba(0,0,0,0.06);
+    z-index:30;
+  }
+  nav.tabbar button{
+    flex:1;
+    background:none;
+    border:none;
+    padding:10px 4px 8px;
+    font-size:0.72rem;
+    font-weight:600;
+    color:var(--text-muted);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:3px;
+    cursor:pointer;
+  }
+  nav.tabbar button .ic{font-size:1.25rem;}
+  nav.tabbar button.active{color:var(--accent-dark);}
+  nav.tabbar button.active .ic{transform:scale(1.05);}
+
+  main{padding:16px;}
+  section.view{display:none;}
+  section.view.active{display:block;}
+
+  /* ---------- Cards / form structure ---------- */
+  .card{
+    background:var(--card);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:16px;
+    margin-bottom:14px;
+  }
+  fieldset{
+    border:none;
+    padding:0;
+    margin:0 0 16px;
+  }
+  legend{
+    font-weight:700;
+    font-size:0.95rem;
+    padding:0 0 6px;
+    color:var(--brand-mid);
+  }
+  label{
+    display:block;
+    font-weight:600;
+    font-size:0.87rem;
+    margin:0 0 6px;
+    color:var(--text);
+  }
+  .required::after{
+    content:" *";
+    color:var(--rouge);
+  }
+  .hint{
+    font-size:0.78rem;
+    color:var(--text-muted);
+    margin:-3px 0 8px;
+  }
+  .field{margin-bottom:16px;}
+
+  input[type="text"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea{
+    width:100%;
+    font-size:1rem;
+    padding:12px 12px;
+    border:1.5px solid var(--border);
+    border-radius:10px;
+    background:#fff;
+    color:var(--text);
+    font-family:inherit;
+  }
+  textarea{resize:vertical;min-height:90px;}
+  input:focus,select:focus,textarea:focus{
+    outline:3px solid #bcd4ec;
+    border-color:var(--accent);
+  }
+
+  /* ---------- Big choice buttons (niveau, urgence, action) ---------- */
+  .choice-grid{display:flex;flex-direction:column;gap:10px;}
+  .choice-btn{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+    text-align:left;
+    padding:14px 14px;
+    font-size:0.95rem;
+    font-weight:700;
+    border-radius:12px;
+    border:2px solid var(--border);
+    background:#fff;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .choice-btn .dot{width:16px;height:16px;border-radius:50%;flex:0 0 auto;}
+  .choice-btn small{display:block;font-weight:500;font-size:0.78rem;color:var(--text-muted);}
+
+  .choice-btn[data-val="vert"] .dot{background:var(--vert);}
+  .choice-btn[data-val="orange"] .dot{background:var(--orange);}
+  .choice-btn[data-val="rouge"] .dot{background:var(--rouge);}
+  .choice-btn[data-val="gris"] .dot{background:var(--gris);}
+
+  .choice-btn.selected[data-val="vert"]{background:var(--vert-bg);border-color:var(--vert);}
+  .choice-btn.selected[data-val="orange"]{background:var(--orange-bg);border-color:var(--orange);}
+  .choice-btn.selected[data-val="rouge"]{background:var(--rouge-bg);border-color:var(--rouge);}
+  .choice-btn.selected[data-val="gris"]{background:var(--gris-bg);border-color:var(--gris);}
+  .choice-btn.selected{box-shadow:inset 0 0 0 1px currentColor;}
+
+  .simple-toggle{display:flex;gap:10px;}
+  .simple-toggle button{
+    flex:1;
+    padding:13px;
+    font-size:0.95rem;
+    font-weight:700;
+    border-radius:10px;
+    border:2px solid var(--border);
+    background:#fff;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .simple-toggle button.selected{
+    background:var(--accent);
+    border-color:var(--accent-dark);
+    color:#fff;
+  }
+
+  .check-grid, .radio-grid{display:flex;flex-direction:column;gap:8px;}
+  .check-item, .radio-item{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:11px 12px;
+    border:1.5px solid var(--border);
+    border-radius:10px;
+    cursor:pointer;
+    font-size:0.9rem;
+  }
+  .check-item input, .radio-item input{margin-top:3px;width:18px;height:18px;flex:0 0 auto;}
+  .check-item.checked, .radio-item.checked{border-color:var(--accent);background:#eef4fb;}
+
+  /* ---------- Photos ---------- */
+  .photo-btns{display:flex;gap:10px;margin-bottom:10px;}
+  .photo-btns label{
+    flex:1;
+    margin:0;
+    text-align:center;
+    padding:12px 8px;
+    border:2px dashed var(--border);
+    border-radius:10px;
+    font-size:0.85rem;
+    font-weight:700;
+    color:var(--accent-dark);
+    cursor:pointer;
+  }
+  .photo-preview{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+  }
+  .photo-thumb{
+    position:relative;
+    border-radius:8px;
+    overflow:hidden;
+    border:1px solid var(--border);
+    aspect-ratio:1/1;
+  }
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo-thumb .rm{
+    position:absolute;top:3px;right:3px;
+    background:rgba(28,37,48,0.75);
+    color:#fff;
+    border:none;
+    border-radius:50%;
+    width:22px;height:22px;
+    font-size:0.85rem;
+    line-height:1;
+    cursor:pointer;
+  }
+  .photo-thumb .photo-size-label{
+    position:absolute;
+    bottom:0;left:0;right:0;
+    background:rgba(28,37,48,0.65);
+    color:#fff;
+    font-size:0.65rem;
+    text-align:center;
+    padding:2px 0;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    display:block;
+    width:100%;
+    padding:15px;
+    font-size:1rem;
+    font-weight:800;
+    border-radius:12px;
+    border:none;
+    cursor:pointer;
+    text-align:center;
+  }
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:active{background:var(--accent-dark);}
+  .btn-secondary{background:#fff;color:var(--accent-dark);border:2px solid var(--accent);}
+  .btn-danger{background:#fff;color:var(--rouge);border:2px solid var(--rouge);}
+  .btn-ghost{background:none;color:var(--text-muted);border:1.5px solid var(--border);}
+  .btn-sm{padding:9px 12px;font-size:0.82rem;border-radius:8px;}
+  .btn-row{display:flex;gap:10px;margin-top:8px;}
+  .btn-row .btn{flex:1;}
+
+  /* ---------- Confirmation banner ---------- */
+  #confirmBanner{
+    display:none;
+    position:fixed;
+    top:14px;left:14px;right:14px;
+    z-index:50;
+    background:var(--vert);
+    color:#fff;
+    padding:14px 16px;
+    border-radius:12px;
+    font-weight:700;
+    box-shadow:var(--shadow);
+    text-align:center;
+  }
+
+  /* ---------- List view ---------- */
+  .filters{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .filters select, .filters input{font-size:0.85rem;padding:9px 8px;}
+  .filters .full{grid-column:1/-1;}
+  .search-box{position:relative;margin-bottom:12px;}
+  .search-box input{padding-left:12px;}
+
+  .badge{
+    display:inline-block;
+    padding:3px 9px;
+    border-radius:20px;
+    font-size:0.72rem;
+    font-weight:800;
+    color:#fff;
+  }
+  .badge.vert{background:var(--vert);}
+  .badge.orange{background:var(--orange);}
+  .badge.rouge{background:var(--rouge);}
+  .badge.gris{background:var(--gris);}
+
+  .demande-item{
+    background:#fff;
+    border-radius:12px;
+    box-shadow:var(--shadow);
+    padding:13px 14px;
+    margin-bottom:10px;
+    cursor:pointer;
+    border-left:6px solid var(--gris);
+  }
+  .demande-item.vert{border-left-color:var(--vert);}
+  .demande-item.orange{border-left-color:var(--orange);}
+  .demande-item.rouge{border-left-color:var(--rouge);}
+  .demande-item.gris{border-left-color:var(--gris);}
+  .demande-item .ref{font-weight:800;font-size:0.9rem;}
+  .demande-item .meta{font-size:0.8rem;color:var(--text-muted);margin-top:3px;}
+  .demande-item .urgent-flag{color:var(--rouge);font-weight:800;font-size:0.75rem;}
+  .demande-item .statut-line{margin-top:6px;font-size:0.78rem;font-weight:700;color:var(--brand-mid);}
+
+  .empty-state{
+    text-align:center;
+    color:var(--text-muted);
+    padding:40px 20px;
+    font-size:0.9rem;
+  }
+
+  /* ---------- Detail modal ---------- */
+  #detailModal{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(28,37,48,0.55);
+    z-index:60;
+    padding:14px;
+    overflow-y:auto;
+  }
+  #detailModal .sheet{
+    background:#fff;
+    border-radius:14px;
+    max-width:600px;
+    margin:20px auto;
+    padding:18px;
+  }
+  #detailModal h3{margin-top:0;}
+  .detail-row{margin-bottom:12px;}
+  .detail-row .k{font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:.03em;}
+  .detail-row .v{font-size:0.95rem;margin-top:2px;white-space:pre-wrap;}
+  .detail-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;}
+  .detail-photos img{width:100%;border-radius:8px;border:1px solid var(--border);object-fit:cover;aspect-ratio:1/1;}
+
+  /* ---------- Settings ---------- */
+  .warn-box{
+    background:#fdf0dd;
+    border:1.5px solid var(--orange);
+    border-radius:10px;
+    padding:12px;
+    font-size:0.85rem;
+    margin-bottom:16px;
+  }
+
+  /* ---------- Print sheet (hidden on screen) ---------- */
+  #printSheet{display:none;}
+
+  @media print{
+    body *{visibility:hidden;}
+    #printSheet, #printSheet *{visibility:visible;}
+    #printSheet{
+      display:block;
+      position:absolute;
+      top:0;left:0;
+      width:100%;
+      padding:20px;
+      font-family:Arial,Helvetica,sans-serif;
+      color:#000;
+    }
+    #printSheet h1{font-size:1.3rem;margin-bottom:0;}
+    #printSheet .sub{color:#555;margin-top:2px;margin-bottom:14px;font-size:0.85rem;}
+    #printSheet table{width:100%;border-collapse:collapse;margin-bottom:12px;}
+    #printSheet td{padding:5px 4px;border-bottom:1px solid #ddd;font-size:0.85rem;vertical-align:top;}
+    #printSheet td.k{font-weight:700;width:32%;}
+    #printSheet .sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:24px;}
+    #printSheet .sign-box{border:1px solid #999;border-radius:6px;height:80px;padding:6px;font-size:0.75rem;}
+    #printSheet .photos{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
+    #printSheet .photos img{width:110px;height:110px;object-fit:cover;border:1px solid #ccc;}
+    #printSheet .sheet-block{page-break-after:always;}
+    #printSheet .sheet-block:last-child{page-break-after:auto;}
+  }
+
+  .sr-only{
+    position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+    overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+  }
+
+  .section-title{
+    font-size:1.05rem;
+    font-weight:800;
+    color:var(--brand-dark);
+    margin:0 0 12px;
+  }
+</style>
+</head>
+<body>
+
+<div id="confirmBanner" role="status" aria-live="polite"></div>
+
+<div class="wrap">
+
+  <header class="app-header">
+    <h1>RVS PEINTURE</h1>
+    <h2>Fiche de demande ou modification chantier</h2>
+    <p class="tagline">Une demande enregistrée est une demande suivie.</p>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         VUE 1 — NOUVELLE DEMANDE
+    ============================================================= -->
+    <section id="view-form" class="view active" aria-labelledby="form-title">
+      <form id="demandeForm" novalidate>
+        <div class="card">
+          <fieldset>
+            <legend>Chantier concerné</legend>
+
+            <div class="field">
+              <label for="chantier" class="required">Chantier</label>
+              <select id="chantier" required>
+                <option value="">— Sélectionner —</option>
+                <option>Groupe scolaire La Beaume</option>
+                <option>Crèche de Lorgues</option>
+                <option>Résidence Les Pins</option>
+                <option value="Autre chantier">Autre chantier</option>
+              </select>
+            </div>
+
+            <div class="field" id="chantierAutreWrap" style="display:none;">
+              <label for="chantierAutre" class="required">Nom du chantier</label>
+              <input type="text" id="chantierAutre" placeholder="Nom du chantier">
+            </div>
+
+            <div class="field">
+              <label for="dateVisite" class="required">Date de la visite</label>
+              <input type="date" id="dateVisite" required>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Demande formulée par</legend>
+            <div class="field">
+              <label for="demandeurType" class="required">Formulée par</label>
+              <select id="demandeurType" required>
+                <option value="">— Sélectionner —</option>
+                <option>Client</option>
+                <option>Architecte</option>
+                <option>Maître d'œuvre</option>
+                <option>Conducteur de travaux</option>
+                <option>Responsable du site</option>
+                <option>Autre entreprise</option>
+                <option>Autre</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="nomDemandeur">Nom du demandeur</label>
+              <input type="text" id="nomDemandeur" placeholder="M. Martin – Cabinet ABC Architecture">
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Localisation et description</legend>
+            <div class="field">
+              <label for="zone" class="required">Zone concernée</label>
+              <input type="text" id="zone" required placeholder="Bâtiment B – R+1 – Salle 104 – mur côté fenêtre">
+            </div>
+            <div class="field">
+              <label for="description" class="required">Description de la demande</label>
+              <p class="hint">Décrire précisément la demande, les surfaces concernées, le résultat attendu et toute information utile. Le dictée vocale du téléphone peut être utilisée.</p>
+              <textarea id="description" required></textarea>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Photos</legend>
+            <div class="photo-btns">
+              <label for="photoCamera">📷 Prendre une photo
+                <input type="file" id="photoCamera" accept="image/*" capture="environment" class="sr-only">
+              </label>
+              <label for="photoGalerie">🖼️ Ajouter depuis la galerie
+                <input type="file" id="photoGalerie" accept="image/*" multiple class="sr-only">
+              </label>
+            </div>
+            <div class="photo-preview" id="photoPreview"></div>
+          </fieldset>
+
+          <fieldset>
+            <legend class="required">Niveau de traitement</legend>
+            <div class="choice-grid" id="niveauGroup" role="radiogroup" aria-label="Niveau de traitement">
+              <button type="button" class="choice-btn" data-val="vert">
+                <span class="dot"></span>
+                <span>Vert<small>Exécution simple sans impact apparent</small></span>
+              </button>
+              <button type="button" class="choice-btn" data-val="orange">
+                <span class="dot"></span>
+                <span>Orange<small>Vérification nécessaire</small></span>
+              </button>
+              <button type="button" class="choice-btn" data-val="rouge">
+                <span class="dot"></span>
+                <span>Rouge<small>Impact sur prix, délai ou responsabilité</small></span>
+              </button>
+              <button type="button" class="choice-btn" data-val="gris">
+                <span class="dot"></span>
+                <span>Gris<small>Niveau non déterminé</small></span>
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Impact possible</legend>
+            <div class="check-grid" id="impactGroup">
+              <!-- injecté en JS -->
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend class="required">Intervention urgente</legend>
+            <div class="simple-toggle" id="urgentToggle">
+              <button type="button" data-val="non" class="selected">Non</button>
+              <button type="button" data-val="oui">Oui</button>
+            </div>
+            <div id="urgentDetails" style="display:none;margin-top:12px;">
+              <div class="field">
+                <label for="urgentDate">Date limite demandée</label>
+                <input type="date" id="urgentDate">
+              </div>
+              <div class="field">
+                <label for="urgentHeure">Heure limite éventuelle</label>
+                <input type="time" id="urgentHeure">
+              </div>
+              <div class="field">
+                <label for="urgentMotif">Motif de l'urgence</label>
+                <textarea id="urgentMotif" style="min-height:60px;"></textarea>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Action autorisée</legend>
+            <div class="radio-grid" id="actionGroup">
+              <!-- injecté en JS -->
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Responsable proposé</legend>
+            <div class="field">
+              <select id="responsable">
+                <option value="">— Sélectionner —</option>
+                <option>Gérant</option>
+                <option>Chef de chantier</option>
+                <option>Secrétariat</option>
+                <option>Sergio / SPC Conseil</option>
+                <option>Conducteur de travaux</option>
+                <option>À déterminer</option>
+              </select>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Commentaire complémentaire</legend>
+            <div class="field">
+              <textarea id="commentaire" placeholder="Précisions, remarques…"></textarea>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Validation de la demande</legend>
+            <label class="check-item" id="validationWrap">
+              <input type="checkbox" id="validationRelue" required>
+              <span>La demande a été relue ou reformulée avec le demandeur avant de quitter le chantier.</span>
+            </label>
+          </fieldset>
+
+        </div>
+
+        <button type="submit" class="btn btn-primary">✅ Enregistrer la demande</button>
+      </form>
+    </section>
+
+    <!-- ============================================================
+         VUE 2 — DEMANDES ENREGISTRÉES
+    ============================================================= -->
+    <section id="view-list" class="view" aria-labelledby="list-title">
+      <p class="section-title" id="list-title">Demandes enregistrées</p>
+
+      <div class="card">
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="Rechercher un mot-clé…">
+        </div>
+        <div class="filters">
+          <select id="filterChantier"><option value="">Tous les chantiers</option></select>
+          <select id="filterNiveau">
+            <option value="">Tous les niveaux</option>
+            <option value="vert">Vert</option>
+            <option value="orange">Orange</option>
+            <option value="rouge">Rouge</option>
+            <option value="gris">Gris</option>
+          </select>
+          <select id="filterResponsable">
+            <option value="">Tous les responsables</option>
+            <option>Gérant</option>
+            <option>Chef de chantier</option>
+            <option>Secrétariat</option>
+            <option>Sergio / SPC Conseil</option>
+            <option>Conducteur de travaux</option>
+            <option>À déterminer</option>
+          </select>
+          <select id="filterStatut"><option value="">Tous les statuts</option></select>
+          <input type="date" id="filterDate" class="full">
+          <label class="check-item full" style="margin:0;">
+            <input type="checkbox" id="filterUrgent">
+            <span>Demandes urgentes uniquement</span>
+          </label>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" id="resetFiltersBtn">Réinitialiser les filtres</button>
+      </div>
+
+      <button type="button" class="btn btn-secondary" id="exportCsvBtn" style="margin-bottom:10px;">⬇️ Exporter en CSV</button>
+      <button type="button" class="btn btn-secondary" id="exportPdfAllBtn" style="margin-bottom:10px;">🖨️ Exporter tout en PDF</button>
+      <button type="button" class="btn btn-secondary" id="exportPhotosBtn" style="margin-bottom:14px;">🖼️ Exporter les photos (.zip)</button>
+
+      <div id="demandesList"></div>
+    </section>
+
+    <!-- ============================================================
+         VUE 3 — PARAMÈTRES
+    ============================================================= -->
+    <section id="view-settings" class="view" aria-labelledby="settings-title">
+      <p class="section-title" id="settings-title">Paramètres</p>
+      <div class="card">
+        <div class="warn-box">
+          Les données (y compris les photos) sont enregistrées uniquement sur cet appareil, dans cette application. Elles ne sont jamais envoyées sur internet. L'application fonctionne aussi sans connexion. Il est recommandé d'exporter régulièrement le fichier CSV par sécurité.
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+          Nombre de demandes enregistrées : <strong id="countInfo">0</strong>
+        </p>
+        <button type="button" class="btn btn-secondary" id="exportCsvBtn2" style="margin-bottom:10px;">⬇️ Exporter en CSV</button>
+        <button type="button" class="btn btn-secondary" id="exportPdfAllBtn2" style="margin-bottom:10px;">🖨️ Exporter tout en PDF</button>
+        <button type="button" class="btn btn-secondary" id="exportPhotosBtn2" style="margin-bottom:14px;">🖼️ Exporter les photos (.zip)</button>
+        <button type="button" class="btn btn-danger" id="resetAllBtn" style="margin-top:2px;">🗑️ Réinitialiser toutes les données</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<nav class="tabbar">
+  <button type="button" data-view="view-form" class="active">
+    <span class="ic">📝</span>Nouvelle demande
+  </button>
+  <button type="button" data-view="view-list">
+    <span class="ic">📋</span>Demandes
+  </button>
+  <button type="button" data-view="view-settings">
+    <span class="ic">⚙️</span>Paramètres
+  </button>
+</nav>
+
+<!-- ============================================================
+     MODALE DÉTAIL
+============================================================= -->
+<div id="detailModal">
+  <div class="sheet" id="detailSheet"></div>
+</div>
+
+<!-- ============================================================
+     FICHE IMPRIMABLE (utilisée uniquement pour l'impression / PDF)
+============================================================= -->
+<div id="printSheet"></div>
+
+<script>
+/* ================================================================
+   RVS PEINTURE — Logique applicative
+   Aucune donnée n'est envoyée en dehors de cet appareil.
+   Stockage : localStorage, clé "rvs_demandes_v1"
+================================================================ */
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "rvs_demandes_v1"; // ancienne clé localStorage (migrée automatiquement)
+  var DB_NAME = "rvs_chantier_db";
+  var DB_VERSION = 1;
+  var STORE_NAME = "demandes";
+
+  var IMPACTS = [
+    "Aucun impact identifié",
+    "Fourniture ou produit",
+    "Quantité supplémentaire",
+    "Main-d'œuvre supplémentaire",
+    "Planning",
+    "Prix",
+    "Technique à valider",
+    "Intervention d'une autre entreprise",
+    "Non déterminé"
+  ];
+
+  var ACTIONS = [
+    "Exécution possible",
+    "Validation du gérant nécessaire",
+    "Confirmation écrite du client nécessaire",
+    "Devis ou chiffrage nécessaire",
+    "Informations insuffisantes"
+  ];
+
+  var STATUTS = [
+    "Demande enregistrée",
+    "À clarifier",
+    "À chiffrer",
+    "À valider par le gérant",
+    "Validée",
+    "Transmise au chef de chantier",
+    "Planifiée",
+    "Réalisée",
+    "Contrôlée",
+    "Refusée"
+  ];
+
+  var NIVEAU_LABELS = {vert:"Vert",orange:"Orange",rouge:"Rouge",gris:"Gris"};
+
+  /* ---------------- État en mémoire ---------------- */
+  var currentPhotos = [];   // photos de la demande en cours de saisie
+  var selectedNiveau = "";
+  var urgentState = "non";
+  var selectedAction = "";
+
+  /* ================= Stockage local (IndexedDB) =================
+     Les demandes (y compris les photos) sont stockées dans IndexedDB,
+     qui offre une capacité largement supérieure à localStorage
+     (plusieurs centaines de Mo selon l'appareil, contre ~5-10 Mo).
+     Un cache en mémoire (demandesCache) garde une copie synchronisée
+     pour que le reste du code puisse lire les données de façon
+     instantanée, comme avant. Chaque écriture est répercutée dans
+     IndexedDB de façon asynchrone. */
+  var demandesCache = [];
+  var dbPromise = null;
+
+  function openDB(){
+    if(dbPromise) return dbPromise;
+    dbPromise = new Promise(function(resolve, reject){
+      if(!("indexedDB" in window)){
+        reject(new Error("IndexedDB non disponible sur ce navigateur."));
+        return;
+      }
+      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function(e){
+        var db = e.target.result;
+        if(!db.objectStoreNames.contains(STORE_NAME)){
+          db.createObjectStore(STORE_NAME, { keyPath: "ref" });
+        }
+      };
+      req.onsuccess = function(e){ resolve(e.target.result); };
+      req.onerror = function(e){ reject(e.target.error); };
+    });
+    return dbPromise;
+  }
+
+  function dbGetAll(){
+    return openDB().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(STORE_NAME, "readonly");
+        var req = tx.objectStore(STORE_NAME).getAll();
+        req.onsuccess = function(){ resolve(req.result || []); };
+        req.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  function dbPut(demande){
+    return openDB().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).put(demande);
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  function dbDelete(ref){
+    return openDB().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).delete(ref);
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  function dbClearAll(){
+    return openDB().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).clear();
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  // Migration unique : si d'anciennes données existent dans
+  // localStorage (version précédente de l'application), on les
+  // transfère vers IndexedDB puis on nettoie localStorage.
+  function migrateFromLocalStorageIfNeeded(){
+    var raw;
+    try{
+      raw = localStorage.getItem(STORAGE_KEY);
+    }catch(e){
+      return Promise.resolve();
+    }
+    if(!raw) return Promise.resolve();
+    var oldList;
+    try{
+      oldList = JSON.parse(raw);
+    }catch(e){
+      oldList = [];
+    }
+    var chain = Promise.resolve();
+    oldList.forEach(function(d){
+      chain = chain.then(function(){ return dbPut(d); });
+    });
+    return chain.then(function(){
+      localStorage.removeItem(STORAGE_KEY);
+    }).catch(function(e){
+      console.error("Erreur de migration des anciennes données :", e);
+    });
+  }
+
+  // Lecture synchrone depuis le cache mémoire (déjà chargé au démarrage)
+  function loadDemandes(){
+    return demandesCache;
+  }
+
+  // Enregistre l'intégralité de la liste : met à jour le cache
+  // immédiatement (pour un affichage instantané) puis répercute
+  // chaque changement dans IndexedDB de façon asynchrone.
+  function saveDemandes(list){
+    var previousCache = demandesCache;
+    demandesCache = list;
+    persistFullList(list).catch(function(e){
+      console.error("Erreur d'enregistrement local :", e);
+      demandesCache = previousCache; // on annule le changement affiché
+      alert("Erreur : impossible d'enregistrer les données sur cet appareil. Réessayez, ou exportez le CSV le plus tôt possible par sécurité.");
+      renderList();
+    });
+    return true;
+  }
+
+  function persistFullList(list){
+    return dbGetAll().then(function(existing){
+      var existingRefs = existing.map(function(d){ return d.ref; });
+      var newRefs = list.map(function(d){ return d.ref; });
+      var toDelete = existingRefs.filter(function(r){ return newRefs.indexOf(r) === -1; });
+      var chain = Promise.resolve();
+      list.forEach(function(d){
+        chain = chain.then(function(){ return dbPut(d); });
+      });
+      toDelete.forEach(function(r){
+        chain = chain.then(function(){ return dbDelete(r); });
+      });
+      return chain;
+    });
+  }
+
+  /* ================= Utilitaires ================= */
+  function pad(n,len){
+    n = String(n);
+    while(n.length < len) n = "0" + n;
+    return n;
+  }
+  function todayISO(){
+    var d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth()+1,2) + "-" + pad(d.getDate(),2);
+  }
+  function nowStamp(){
+    var d = new Date();
+    return d.toISOString();
+  }
+  function formatDateFr(iso){
+    if(!iso) return "";
+    var parts = iso.split("-");
+    if(parts.length!==3) return iso;
+    return parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+  function formatDateTimeFr(iso){
+    if(!iso) return "";
+    var d = new Date(iso);
+    if(isNaN(d.getTime())) return iso;
+    return pad(d.getDate(),2)+"/"+pad(d.getMonth()+1,2)+"/"+d.getFullYear()+" à "+pad(d.getHours(),2)+":"+pad(d.getMinutes(),2);
+  }
+  function escapeHtml(str){
+    if(str === undefined || str === null) return "";
+    return String(str)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+
+  function generateRef(list){
+    var d = new Date();
+    var prefix = "RVS-" + d.getFullYear() + pad(d.getMonth()+1,2) + pad(d.getDate(),2);
+    var countToday = list.filter(function(x){ return x.ref && x.ref.indexOf(prefix) === 0; }).length;
+    return prefix + "-" + pad(countToday+1,3);
+  }
+
+  /* ================= Navigation entre vues ================= */
+  var tabButtons = document.querySelectorAll(".tabbar button");
+  tabButtons.forEach(function(btn){
+    btn.addEventListener("click", function(){
+      showView(btn.getAttribute("data-view"));
+    });
+  });
+  function showView(id){
+    document.querySelectorAll("section.view").forEach(function(s){ s.classList.remove("active"); });
+    document.getElementById(id).classList.add("active");
+    tabButtons.forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-view")===id); });
+    if(id === "view-list"){ renderList(); }
+    if(id === "view-settings"){ refreshSettingsInfo(); }
+    window.scrollTo(0,0);
+  }
+
+  /* ================= Formulaire : initialisation des groupes ================= */
+  var chantierSelect = document.getElementById("chantier");
+  var chantierAutreWrap = document.getElementById("chantierAutreWrap");
+  var chantierAutreInput = document.getElementById("chantierAutre");
+  chantierSelect.addEventListener("change", function(){
+    chantierAutreWrap.style.display = (chantierSelect.value === "Autre chantier") ? "block" : "none";
+  });
+
+  document.getElementById("dateVisite").value = todayISO();
+
+  // Niveau de traitement (choix unique, gros boutons)
+  var niveauGroup = document.getElementById("niveauGroup");
+  niveauGroup.querySelectorAll(".choice-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      selectedNiveau = btn.getAttribute("data-val");
+      niveauGroup.querySelectorAll(".choice-btn").forEach(function(b){ b.classList.remove("selected"); });
+      btn.classList.add("selected");
+    });
+  });
+
+  // Impact possible (cases à cocher multiples)
+  var impactGroup = document.getElementById("impactGroup");
+  IMPACTS.forEach(function(label,i){
+    var id = "impact_"+i;
+    var wrap = document.createElement("label");
+    wrap.className = "check-item";
+    wrap.setAttribute("for", id);
+    wrap.innerHTML = '<input type="checkbox" id="'+id+'" value="'+escapeHtml(label)+'"><span>'+escapeHtml(label)+'</span>';
+    impactGroup.appendChild(wrap);
+    var cb = wrap.querySelector("input");
+    cb.addEventListener("change", function(){ wrap.classList.toggle("checked", cb.checked); });
+  });
+
+  // Intervention urgente (oui/non)
+  var urgentToggle = document.getElementById("urgentToggle");
+  var urgentDetails = document.getElementById("urgentDetails");
+  urgentToggle.querySelectorAll("button").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      urgentState = btn.getAttribute("data-val");
+      urgentToggle.querySelectorAll("button").forEach(function(b){ b.classList.remove("selected"); });
+      btn.classList.add("selected");
+      urgentDetails.style.display = (urgentState === "oui") ? "block" : "none";
+    });
+  });
+
+  // Action autorisée (choix unique)
+  var actionGroup = document.getElementById("actionGroup");
+  ACTIONS.forEach(function(label,i){
+    var id = "action_"+i;
+    var wrap = document.createElement("label");
+    wrap.className = "radio-item";
+    wrap.setAttribute("for", id);
+    wrap.innerHTML = '<input type="radio" name="actionAutorisee" id="'+id+'" value="'+escapeHtml(label)+'"><span>'+escapeHtml(label)+'</span>';
+    actionGroup.appendChild(wrap);
+    var rb = wrap.querySelector("input");
+    rb.addEventListener("change", function(){
+      selectedAction = label;
+      actionGroup.querySelectorAll(".radio-item").forEach(function(w){ w.classList.remove("checked"); });
+      wrap.classList.add("checked");
+    });
+  });
+
+  /* ================= Photos ================= */
+  var photoPreview = document.getElementById("photoPreview");
+
+  // Les photos du téléphone (souvent 3 à 8 Mo en haute résolution) sont
+  // redimensionnées et recompressées en JPEG avant d'être stockées, afin
+  // de limiter la place occupée sur l'appareil. Réglages ajustables :
+  var PHOTO_MAX_DIMENSION = 1600; // taille max du plus grand côté, en pixels
+  var PHOTO_JPEG_QUALITY = 0.72;  // 0 (très compressé) à 1 (qualité maximale)
+
+  function compressImageFile(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        var img = new Image();
+        img.onload = function(){
+          var w = img.naturalWidth, h = img.naturalHeight;
+          var scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(w, h));
+          var targetW = Math.max(1, Math.round(w * scale));
+          var targetH = Math.max(1, Math.round(h * scale));
+          var canvas = document.createElement("canvas");
+          canvas.width = targetW;
+          canvas.height = targetH;
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          try{
+            var dataUrl = canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
+            resolve(dataUrl);
+          }catch(err){
+            reject(err);
+          }
+        };
+        img.onerror = function(){ reject(new Error("Image illisible")); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function(){ reject(new Error("Lecture du fichier impossible")); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function handleFiles(fileList){
+    var files = Array.prototype.slice.call(fileList || []);
+    files.forEach(function(file){
+      if(!file.type || file.type.indexOf("image/") !== 0) return;
+      var photoName = file.name || ("photo_" + Date.now() + ".jpg");
+      compressImageFile(file).then(function(dataUrl){
+        currentPhotos.push({ name: photoName, dataUrl: dataUrl });
+        renderPhotoPreview();
+      }).catch(function(err){
+        console.error("Erreur de compression de la photo, utilisation de l'original :", err);
+        // Repli : si la compression échoue (format non supporté par exemple),
+        // on garde la photo d'origine plutôt que de la perdre.
+        var reader = new FileReader();
+        reader.onload = function(e2){
+          currentPhotos.push({ name: photoName, dataUrl: e2.target.result });
+          renderPhotoPreview();
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+  }
+  document.getElementById("photoCamera").addEventListener("change", function(e){
+    handleFiles(e.target.files);
+    e.target.value = "";
+  });
+  document.getElementById("photoGalerie").addEventListener("change", function(e){
+    handleFiles(e.target.files);
+    e.target.value = "";
+  });
+  function estimateDataUrlKB(dataUrl){
+    // Une chaîne base64 pèse environ 4/3 du poids réel du fichier.
+    var base64 = dataUrl.split(",")[1] || "";
+    var bytes = Math.round(base64.length * 0.75);
+    return Math.round(bytes / 1024);
+  }
+  function renderPhotoPreview(){
+    photoPreview.innerHTML = "";
+    currentPhotos.forEach(function(p, idx){
+      var div = document.createElement("div");
+      div.className = "photo-thumb";
+      var kb = estimateDataUrlKB(p.dataUrl);
+      div.innerHTML = '<img src="'+p.dataUrl+'" alt="Photo '+(idx+1)+'"><button type="button" class="rm" aria-label="Supprimer la photo" data-idx="'+idx+'">✕</button><span class="photo-size-label">'+kb+' Ko</span>';
+      photoPreview.appendChild(div);
+    });
+    photoPreview.querySelectorAll(".rm").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var idx = parseInt(btn.getAttribute("data-idx"),10);
+        currentPhotos.splice(idx,1);
+        renderPhotoPreview();
+      });
+    });
+  }
+
+  /* ================= Validation & enregistrement du formulaire ================= */
+  var form = document.getElementById("demandeForm");
+  var validationCheckbox = document.getElementById("validationRelue");
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+
+    var errors = [];
+    if(!chantierSelect.value) errors.push("Chantier");
+    if(chantierSelect.value === "Autre chantier" && !chantierAutreInput.value.trim()) errors.push("Nom du chantier");
+    if(!document.getElementById("dateVisite").value) errors.push("Date de la visite");
+    if(!document.getElementById("demandeurType").value) errors.push("Demande formulée par");
+    if(!document.getElementById("zone").value.trim()) errors.push("Zone concernée");
+    if(!document.getElementById("description").value.trim()) errors.push("Description de la demande");
+    if(!selectedNiveau) errors.push("Niveau de traitement");
+    if(!validationCheckbox.checked) errors.push("Confirmation de relecture avec le demandeur");
+
+    if(errors.length){
+      alert("Merci de compléter les champs obligatoires suivants :\n\n• " + errors.join("\n• "));
+      return;
+    }
+
+    var list = loadDemandes();
+    var ref = generateRef(list);
+    var nowIso = nowStamp();
+
+    var impacts = Array.prototype.slice.call(impactGroup.querySelectorAll("input:checked")).map(function(cb){ return cb.value; });
+
+    var demande = {
+      ref: ref,
+      chantier: chantierSelect.value === "Autre chantier" ? chantierAutreInput.value.trim() : chantierSelect.value,
+      dateVisite: document.getElementById("dateVisite").value,
+      demandeurType: document.getElementById("demandeurType").value,
+      nomDemandeur: document.getElementById("nomDemandeur").value.trim(),
+      zone: document.getElementById("zone").value.trim(),
+      description: document.getElementById("description").value.trim(),
+      photos: currentPhotos.slice(),
+      niveau: selectedNiveau,
+      impacts: impacts,
+      urgent: urgentState === "oui",
+      urgentDate: urgentState === "oui" ? document.getElementById("urgentDate").value : "",
+      urgentHeure: urgentState === "oui" ? document.getElementById("urgentHeure").value : "",
+      urgentMotif: urgentState === "oui" ? document.getElementById("urgentMotif").value.trim() : "",
+      action: selectedAction,
+      responsable: document.getElementById("responsable").value,
+      commentaire: document.getElementById("commentaire").value.trim(),
+      validationRelue: true,
+      statut: STATUTS[0],
+      dateCreation: nowIso,
+      dateStatutChange: nowIso
+    };
+
+    list.push(demande);
+    var ok = saveDemandes(list);
+    if(!ok) return;
+
+    showConfirmation("Demande " + ref + " enregistrée avec succès.");
+    resetForm();
+    populateFilterOptions();
+  });
+
+  function resetForm(){
+    form.reset();
+    document.getElementById("dateVisite").value = todayISO();
+    chantierAutreWrap.style.display = "none";
+
+    currentPhotos = [];
+    renderPhotoPreview();
+
+    selectedNiveau = "";
+    niveauGroup.querySelectorAll(".choice-btn").forEach(function(b){ b.classList.remove("selected"); });
+
+    impactGroup.querySelectorAll(".check-item").forEach(function(w){ w.classList.remove("checked"); });
+
+    urgentState = "non";
+    urgentToggle.querySelectorAll("button").forEach(function(b){ b.classList.remove("selected"); });
+    urgentToggle.querySelector('[data-val="non"]').classList.add("selected");
+    urgentDetails.style.display = "none";
+
+    selectedAction = "";
+    actionGroup.querySelectorAll(".radio-item").forEach(function(w){ w.classList.remove("checked"); });
+  }
+
+  function showConfirmation(msg){
+    var banner = document.getElementById("confirmBanner");
+    banner.textContent = "✅ " + msg;
+    banner.style.display = "block";
+    setTimeout(function(){ banner.style.display = "none"; }, 3200);
+  }
+
+  /* ================= Liste des demandes ================= */
+  var filterChantier = document.getElementById("filterChantier");
+  var filterNiveau = document.getElementById("filterNiveau");
+  var filterResponsable = document.getElementById("filterResponsable");
+  var filterStatut = document.getElementById("filterStatut");
+  var filterDate = document.getElementById("filterDate");
+  var filterUrgent = document.getElementById("filterUrgent");
+  var searchInput = document.getElementById("searchInput");
+
+  STATUTS.forEach(function(s){
+    var opt = document.createElement("option");
+    opt.value = s; opt.textContent = s;
+    filterStatut.appendChild(opt);
+  });
+
+  function populateFilterOptions(){
+    var list = loadDemandes();
+    var chantiers = Array.from(new Set(list.map(function(d){ return d.chantier; }))).sort();
+    var current = filterChantier.value;
+    filterChantier.innerHTML = '<option value="">Tous les chantiers</option>';
+    chantiers.forEach(function(c){
+      var opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
+      filterChantier.appendChild(opt);
+    });
+    filterChantier.value = current;
+  }
+
+  [filterChantier, filterNiveau, filterResponsable, filterStatut, filterDate, filterUrgent, searchInput].forEach(function(el){
+    el.addEventListener("input", renderList);
+    el.addEventListener("change", renderList);
+  });
+
+  document.getElementById("resetFiltersBtn").addEventListener("click", function(){
+    filterChantier.value = "";
+    filterNiveau.value = "";
+    filterResponsable.value = "";
+    filterStatut.value = "";
+    filterDate.value = "";
+    filterUrgent.checked = false;
+    searchInput.value = "";
+    renderList();
+  });
+
+  function getFilteredDemandes(){
+    var list = loadDemandes().slice().sort(function(a,b){ return (b.dateCreation||"").localeCompare(a.dateCreation||""); });
+    var q = searchInput.value.trim().toLowerCase();
+
+    return list.filter(function(d){
+      if(filterChantier.value && d.chantier !== filterChantier.value) return false;
+      if(filterNiveau.value && d.niveau !== filterNiveau.value) return false;
+      if(filterResponsable.value && d.responsable !== filterResponsable.value) return false;
+      if(filterStatut.value && d.statut !== filterStatut.value) return false;
+      if(filterDate.value && d.dateVisite !== filterDate.value) return false;
+      if(filterUrgent.checked && !d.urgent) return false;
+      if(q){
+        var hay = [d.ref,d.chantier,d.zone,d.description,d.nomDemandeur,d.commentaire].join(" ").toLowerCase();
+        if(hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderList(){
+    populateFilterOptions();
+    var list = getFilteredDemandes();
+    var container = document.getElementById("demandesList");
+    container.innerHTML = "";
+
+    if(list.length === 0){
+      container.innerHTML = '<div class="empty-state">Aucune demande ne correspond aux critères actuels.</div>';
+      return;
+    }
+
+    list.forEach(function(d){
+      var item = document.createElement("div");
+      item.className = "demande-item " + (d.niveau || "gris");
+      item.innerHTML =
+        '<div class="ref">' + escapeHtml(d.ref) + ' <span class="badge ' + (d.niveau||"gris") + '">' + NIVEAU_LABELS[d.niveau||"gris"] + '</span></div>' +
+        '<div class="meta">' + escapeHtml(d.chantier) + ' · ' + formatDateFr(d.dateVisite) + '</div>' +
+        '<div class="meta">' + escapeHtml(d.zone) + '</div>' +
+        '<div class="meta">Demandeur : ' + escapeHtml(d.nomDemandeur || d.demandeurType || "—") + '</div>' +
+        (d.urgent ? '<div class="urgent-flag">⚠ URGENT</div>' : '') +
+        '<div class="statut-line">' + escapeHtml(d.statut) + '</div>';
+      item.addEventListener("click", function(){ openDetail(d.ref); });
+      container.appendChild(item);
+    });
+  }
+
+  /* ================= Détail d'une demande ================= */
+  var detailModal = document.getElementById("detailModal");
+  var detailSheet = document.getElementById("detailSheet");
+
+  function openDetail(ref){
+    var list = loadDemandes();
+    var d = list.find(function(x){ return x.ref === ref; });
+    if(!d) return;
+
+    var statutOptions = STATUTS.map(function(s){
+      return '<option value="'+escapeHtml(s)+'"'+(s===d.statut?' selected':'')+'>'+escapeHtml(s)+'</option>';
+    }).join("");
+
+    var photosHtml = "";
+    if(d.photos && d.photos.length){
+      photosHtml = '<div class="detail-photos">' + d.photos.map(function(p){ return '<img src="'+p.dataUrl+'" alt="Photo de la demande">'; }).join("") + '</div>';
+    }
+
+    detailSheet.innerHTML =
+      '<h3>' + escapeHtml(d.ref) + ' <span class="badge ' + (d.niveau||"gris") + '">' + NIVEAU_LABELS[d.niveau||"gris"] + '</span></h3>' +
+
+      row("Chantier", d.chantier) +
+      row("Date de la visite", formatDateFr(d.dateVisite)) +
+      row("Demande formulée par", d.demandeurType) +
+      row("Nom du demandeur", d.nomDemandeur || "—") +
+      row("Zone concernée", d.zone) +
+      row("Description", d.description) +
+      (photosHtml ? '<div class="detail-row"><div class="k">Photos</div>' + photosHtml + '</div>' : "") +
+      row("Impact possible", (d.impacts && d.impacts.length) ? d.impacts.join(", ") : "—") +
+      row("Intervention urgente", d.urgent ? ("Oui — échéance : " + (formatDateFr(d.urgentDate)||"—") + " " + (d.urgentHeure||"") + " — Motif : " + (d.urgentMotif||"—")) : "Non") +
+      row("Action autorisée", d.action || "—") +
+      row("Responsable proposé", d.responsable || "—") +
+      row("Commentaire", d.commentaire || "—") +
+      row("Créée le", formatDateTimeFr(d.dateCreation)) +
+      row("Dernier changement de statut", formatDateTimeFr(d.dateStatutChange)) +
+
+      '<div class="field" style="margin-top:14px;">' +
+        '<label for="statutSelect">Statut de la demande</label>' +
+        '<select id="statutSelect">' + statutOptions + '</select>' +
+      '</div>' +
+
+      '<div class="btn-row">' +
+        '<button type="button" class="btn btn-secondary btn-sm" id="printBtn">🖨️ Imprimer / PDF</button>' +
+        '<button type="button" class="btn btn-danger btn-sm" id="deleteBtn">🗑️ Supprimer</button>' +
+      '</div>' +
+      '<button type="button" class="btn btn-ghost" id="closeDetailBtn" style="margin-top:10px;">Fermer</button>';
+
+    detailModal.style.display = "block";
+
+    document.getElementById("closeDetailBtn").addEventListener("click", closeDetail);
+
+    document.getElementById("statutSelect").addEventListener("change", function(e){
+      var all = loadDemandes();
+      var target = all.find(function(x){ return x.ref === ref; });
+      if(!target) return;
+      target.statut = e.target.value;
+      target.dateStatutChange = nowStamp();
+      saveDemandes(all);
+      renderList();
+    });
+
+    document.getElementById("deleteBtn").addEventListener("click", function(){
+      if(confirm("Confirmez-vous la suppression définitive de la demande " + ref + " ?")){
+        var all = loadDemandes().filter(function(x){ return x.ref !== ref; });
+        saveDemandes(all);
+        closeDetail();
+        renderList();
+      }
+    });
+
+    document.getElementById("printBtn").addEventListener("click", function(){ printDemande(ref); });
+  }
+
+  function row(label, value){
+    return '<div class="detail-row"><div class="k">' + escapeHtml(label) + '</div><div class="v">' + escapeHtml(value || "—") + '</div></div>';
+  }
+
+  function closeDetail(){
+    detailModal.style.display = "none";
+    detailSheet.innerHTML = "";
+  }
+  detailModal.addEventListener("click", function(e){
+    if(e.target === detailModal) closeDetail();
+  });
+
+  /* ================= Impression / PDF ================= */
+  function buildSheetHtml(d){
+    var photosHtml = "";
+    if(d.photos && d.photos.length){
+      photosHtml = '<div class="photos">' + d.photos.map(function(p){ return '<img src="'+p.dataUrl+'">'; }).join("") + '</div>';
+    }
+    return (
+      '<div class="sheet-block">' +
+      '<h1>RVS PEINTURE</h1>' +
+      '<div class="sub">Fiche de demande ou modification chantier — ' + escapeHtml(d.ref) + '</div>' +
+      '<table>' +
+        trow("Chantier", d.chantier) +
+        trow("Date de la visite", formatDateFr(d.dateVisite)) +
+        trow("Demande formulée par", d.demandeurType) +
+        trow("Nom du demandeur", d.nomDemandeur) +
+        trow("Zone concernée", d.zone) +
+        trow("Description", d.description) +
+        trow("Niveau de traitement", NIVEAU_LABELS[d.niveau||"gris"]) +
+        trow("Impact possible", (d.impacts||[]).join(", ")) +
+        trow("Intervention urgente", d.urgent ? ("Oui — échéance " + formatDateFr(d.urgentDate) + " " + (d.urgentHeure||"") + " — " + (d.urgentMotif||"")) : "Non") +
+        trow("Action autorisée", d.action) +
+        trow("Responsable proposé", d.responsable) +
+        trow("Commentaire", d.commentaire) +
+        trow("Statut actuel", d.statut) +
+      '</table>' +
+      photosHtml +
+      '<div class="sign-grid">' +
+        '<div class="sign-box"><strong>Validation du gérant</strong><br><br>Date : ____________<br>Signature :</div>' +
+        '<div class="sign-box"><strong>Transmission au chef de chantier</strong><br><br>Date : ____________<br>Signature :</div>' +
+        '<div class="sign-box"><strong>Date de réalisation</strong><br><br>____________</div>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function printDemande(ref){
+    var list = loadDemandes();
+    var d = list.find(function(x){ return x.ref === ref; });
+    if(!d) return;
+    document.getElementById("printSheet").innerHTML = buildSheetHtml(d);
+    window.print();
+  }
+
+  function exportAllPdf(){
+    var list = loadDemandes().slice().sort(function(a,b){ return (a.dateCreation||"").localeCompare(b.dateCreation||""); });
+    if(list.length === 0){
+      alert("Aucune demande à exporter.");
+      return;
+    }
+    var html = list.map(buildSheetHtml).join("");
+    document.getElementById("printSheet").innerHTML = html;
+    window.print();
+  }
+
+  function trow(k,v){
+    return '<tr><td class="k">' + escapeHtml(k) + '</td><td>' + escapeHtml(v || "—") + '</td></tr>';
+  }
+
+  /* ================= Export des photos (.zip) =================
+     Générateur ZIP minimal en JavaScript pur (méthode "stockage",
+     sans compression) : aucune librairie externe requise. */
+  var CRC_TABLE = (function(){
+    var table = [];
+    for(var n=0; n<256; n++){
+      var c = n;
+      for(var k=0; k<8; k++){
+        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+  function crc32(bytes){
+    var crc = 0xFFFFFFFF;
+    for(var i=0; i<bytes.length; i++){
+      crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xFF];
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+  function dataUrlToBytes(dataUrl){
+    var base64 = dataUrl.split(",")[1] || "";
+    var binary = atob(base64);
+    var bytes = new Uint8Array(binary.length);
+    for(var i=0; i<binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+  function strToBytes(str){
+    var bytes = new Uint8Array(str.length);
+    for(var i=0; i<str.length; i++) bytes[i] = str.charCodeAt(i) & 0xFF;
+    return bytes;
+  }
+  function dosDateTime(){
+    var d = new Date();
+    var time = ((d.getHours() & 0x1F) << 11) | ((d.getMinutes() & 0x3F) << 5) | ((Math.floor(d.getSeconds()/2)) & 0x1F);
+    var date = (((d.getFullYear()-1980) & 0x7F) << 9) | (((d.getMonth()+1) & 0x0F) << 5) | (d.getDate() & 0x1F);
+    return { time: time, date: date };
+  }
+  function buildZip(files){
+    // files: [{ name: "dossier/fichier.jpg", data: Uint8Array }]
+    var dt = dosDateTime();
+    var localParts = [];
+    var centralParts = [];
+    var offset = 0;
+
+    files.forEach(function(f){
+      var nameBytes = strToBytes(f.name);
+      var crc = crc32(f.data);
+      var size = f.data.length;
+
+      var local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true);
+      local.setUint16(4, 20, true);
+      local.setUint16(6, 0, true);
+      local.setUint16(8, 0, true);
+      local.setUint16(10, dt.time, true);
+      local.setUint16(12, dt.date, true);
+      local.setUint32(14, crc, true);
+      local.setUint32(18, size, true);
+      local.setUint32(22, size, true);
+      local.setUint16(26, nameBytes.length, true);
+      local.setUint16(28, 0, true);
+
+      localParts.push(new Uint8Array(local.buffer), nameBytes, f.data);
+
+      var central = new DataView(new ArrayBuffer(46));
+      central.setUint32(0, 0x02014b50, true);
+      central.setUint16(4, 20, true);
+      central.setUint16(6, 20, true);
+      central.setUint16(8, 0, true);
+      central.setUint16(10, 0, true);
+      central.setUint16(12, dt.time, true);
+      central.setUint16(14, dt.date, true);
+      central.setUint32(16, crc, true);
+      central.setUint32(20, size, true);
+      central.setUint32(24, size, true);
+      central.setUint16(28, nameBytes.length, true);
+      central.setUint16(30, 0, true);
+      central.setUint16(32, 0, true);
+      central.setUint16(34, 0, true);
+      central.setUint16(36, 0, true);
+      central.setUint32(38, 0, true);
+      central.setUint32(42, offset, true);
+
+      centralParts.push(new Uint8Array(central.buffer), nameBytes);
+
+      offset += local.buffer.byteLength + nameBytes.length + f.data.length;
+    });
+
+    var centralSize = centralParts.reduce(function(sum, p){ return sum + p.length; }, 0);
+    var centralOffset = offset;
+
+    var end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(4, 0, true);
+    end.setUint16(6, 0, true);
+    end.setUint16(8, files.length, true);
+    end.setUint16(10, files.length, true);
+    end.setUint32(12, centralSize, true);
+    end.setUint32(16, centralOffset, true);
+    end.setUint16(20, 0, true);
+
+    var allParts = localParts.concat(centralParts, [new Uint8Array(end.buffer)]);
+    return new Blob(allParts, { type: "application/zip" });
+  }
+
+  function sanitizeFileName(name){
+    return String(name || "photo.jpg").replace(/[\\/:*?"<>|]/g, "_");
+  }
+
+  function exportPhotosZip(){
+    var list = loadDemandes();
+    var files = [];
+    list.forEach(function(d){
+      if(!d.photos || !d.photos.length) return;
+      d.photos.forEach(function(p, idx){
+        var ext = ".jpg";
+        var baseName = sanitizeFileName(p.name || ("photo_" + (idx+1)));
+        if(!/\.[a-zA-Z0-9]{2,4}$/.test(baseName)) baseName += ext;
+        files.push({
+          name: sanitizeFileName(d.ref) + "/" + (idx+1) + "_" + baseName,
+          data: dataUrlToBytes(p.dataUrl)
+        });
+      });
+    });
+
+    if(files.length === 0){
+      alert("Aucune photo à exporter.");
+      return;
+    }
+
+    try{
+      var blob = buildZip(files);
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      var d2 = new Date();
+      a.href = url;
+      a.download = "rvs-photos-" + d2.getFullYear() + pad(d2.getMonth()+1,2) + pad(d2.getDate(),2) + ".zip";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }catch(e){
+      console.error("Erreur lors de la création du fichier zip :", e);
+      alert("Erreur : impossible de générer le fichier des photos.");
+    }
+  }
+
+  /* ================= Export CSV ================= */
+  function exportCsv(){
+    var list = loadDemandes();
+    if(list.length === 0){
+      alert("Aucune demande à exporter.");
+      return;
+    }
+    var headers = [
+      "Référence","Chantier","Date visite","Demandé par (type)","Nom du demandeur",
+      "Zone concernée","Description","Niveau","Impacts","Urgent","Date limite urgence",
+      "Heure limite urgence","Motif urgence","Action autorisée","Responsable proposé",
+      "Commentaire","Statut","Nombre de photos","Fichiers photos (voir export .zip)","Créée le","Dernier changement de statut"
+    ];
+
+    function csvEscape(val){
+      var s = (val === undefined || val === null) ? "" : String(val);
+      s = s.replace(/"/g,'""');
+      return '"' + s + '"';
+    }
+
+    var lines = [headers.map(csvEscape).join(";")];
+    list.forEach(function(d){
+      var photoNames = (d.photos || []).map(function(p,idx){ return (idx+1) + "_" + (p.name || "photo.jpg"); }).join(" | ");
+      var fields = [
+        d.ref, d.chantier, formatDateFr(d.dateVisite), d.demandeurType, d.nomDemandeur,
+        d.zone, d.description, NIVEAU_LABELS[d.niveau||"gris"], (d.impacts||[]).join(" | "),
+        d.urgent ? "Oui" : "Non", formatDateFr(d.urgentDate), d.urgentHeure, d.urgentMotif,
+        d.action, d.responsable, d.commentaire, d.statut,
+        (d.photos ? d.photos.length : 0), photoNames,
+        formatDateTimeFr(d.dateCreation), formatDateTimeFr(d.dateStatutChange)
+      ];
+      lines.push(fields.map(csvEscape).join(";"));
+    });
+
+    // BOM pour une bonne lecture des accents dans Excel
+    var csvContent = "\uFEFF" + lines.join("\r\n");
+    var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var d2 = new Date();
+    a.href = url;
+    a.download = "rvs-demandes-" + d2.getFullYear() + pad(d2.getMonth()+1,2) + pad(d2.getDate(),2) + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  document.getElementById("exportCsvBtn").addEventListener("click", exportCsv);
+  document.getElementById("exportCsvBtn2").addEventListener("click", exportCsv);
+  document.getElementById("exportPdfAllBtn").addEventListener("click", exportAllPdf);
+  document.getElementById("exportPdfAllBtn2").addEventListener("click", exportAllPdf);
+  document.getElementById("exportPhotosBtn").addEventListener("click", exportPhotosZip);
+  document.getElementById("exportPhotosBtn2").addEventListener("click", exportPhotosZip);
+
+  /* ================= Paramètres ================= */
+  function refreshSettingsInfo(){
+    document.getElementById("countInfo").textContent = loadDemandes().length;
+  }
+
+  document.getElementById("resetAllBtn").addEventListener("click", function(){
+    if(!confirm("Cette action supprimera DÉFINITIVEMENT toutes les demandes enregistrées sur cet appareil. Confirmez-vous ?")) return;
+    if(!confirm("Dernière confirmation : voulez-vous vraiment tout réinitialiser ? Cette action est irréversible.")) return;
+    dbClearAll().then(function(){
+      try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+      demandesCache = [];
+      renderList();
+      refreshSettingsInfo();
+      showConfirmation("Toutes les données ont été réinitialisées.");
+    }).catch(function(e){
+      console.error("Erreur lors de la réinitialisation :", e);
+      alert("Erreur : impossible de réinitialiser les données sur cet appareil.");
+    });
+  });
+
+  /* ================= Service Worker (mode hors-ligne) ================= */
+  function registerServiceWorker(){
+    if("serviceWorker" in navigator){
+      navigator.serviceWorker.register("./service-worker.js").catch(function(e){
+        console.error("Erreur d'enregistrement du service worker :", e);
+      });
+    }
+  }
+
+  /* ================= Démarrage ================= */
+  function initApp(){
+    migrateFromLocalStorageIfNeeded()
+      .then(function(){ return dbGetAll(); })
+      .then(function(list){
+        demandesCache = list;
+      })
+      .catch(function(e){
+        console.error("Erreur d'ouverture du stockage local :", e);
+        alert("Erreur : impossible d'ouvrir le stockage local de cet appareil. L'application peut fonctionner de façon limitée.");
+        demandesCache = [];
+      })
+      .then(function(){
+        populateFilterOptions();
+        renderList();
+        refreshSettingsInfo();
+      });
+    registerServiceWorker();
+  }
+
+  initApp();
+
+})();
+</script>
+
+</body>
+</html>

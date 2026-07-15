@@ -1654,8 +1654,14 @@
     return '<c r="' + colLetter(colIdx) + rowNum + '" t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(text) + '</t></is></c>';
   }
   function buildDataSheetXml(headers, rows){
+    var lastCol = colLetter(Math.max(0, headers.length - 1));
+    var lastRow = rows.length + 1;
     var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<dimension ref="A1:' + lastCol + lastRow + '"/>' +
+      '<sheetViews><sheetView workbookViewId="0"/></sheetViews>' +
+      '<sheetFormatPr defaultRowHeight="15"/>' +
+      '<sheetData>';
     var allRows = [headers].concat(rows);
     allRows.forEach(function(rowVals, rIdx){
       var rowNum = rIdx + 1;
@@ -1700,9 +1706,9 @@
         '<xdr:from><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + (rowNum - 1) + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>' +
         '<xdr:ext cx="' + (boxW * PX_TO_EMU) + '" cy="' + (boxH * PX_TO_EMU) + '"/>' +
         '<xdr:pic>' +
-          '<xdr:nvPicPr><xdr:cNvPr id="' + (idx + 2) + '" name="Photo' + (idx + 1) + '"/><xdr:cNvPicPr/></xdr:nvPicPr>' +
+          '<xdr:nvPicPr><xdr:cNvPr id="' + (idx + 2) + '" name="Photo' + (idx + 1) + '" descr="' + xmlEscape(p.fileName) + '"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>' +
           '<xdr:blipFill><a:blip r:embed="rId' + (idx + 1) + '"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>' +
-          '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + (boxW * PX_TO_EMU) + '" cy="' + (boxH * PX_TO_EMU) + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>' +
+          '<xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>' +
         '</xdr:pic>' +
         '<xdr:clientData/>' +
         '</xdr:oneCellAnchor>';
@@ -1711,8 +1717,12 @@
     });
 
     var drawingTag = entries.length > 0 ? '<drawing r:id="rId1"/>' : "";
+    var lastRow2 = entries.length + 1;
     var sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<dimension ref="A1:E' + lastRow2 + '"/>' +
+      '<sheetViews><sheetView workbookViewId="0"/></sheetViews>' +
+      '<sheetFormatPr defaultRowHeight="15"/>' +
       '<cols><col min="1" max="1" width="22" customWidth="1"/><col min="2" max="2" width="26" customWidth="1"/><col min="3" max="3" width="14" customWidth="1"/><col min="4" max="4" width="24" customWidth="1"/><col min="5" max="5" width="24" customWidth="1"/></cols>' +
       '<sheetData><row r="1">' + xlsxCell(0,1,headers[0]) + xlsxCell(1,1,headers[1]) + xlsxCell(2,1,headers[2]) + xlsxCell(3,1,headers[3]) + '</row>' +
       rowsXml + '</sheetData>' + drawingTag + '</worksheet>';
@@ -1736,7 +1746,8 @@
   var XLSX_WORKBOOK =
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-    '<sheets><sheet name="Demandes" sheetId="1" r:id="rId1"/><sheet name="Photos" sheetId="2" r:id="rId2"/></sheets>' +
+    '<bookViews><workbookView activeTab="0"/></bookViews>' +
+    '<sheets><sheet name="Demandes" sheetId="1" state="visible" r:id="rId1"/><sheet name="Photos" sheetId="2" state="visible" r:id="rId2"/></sheets>' +
     '</workbook>';
 
   var XLSX_WORKBOOK_RELS =

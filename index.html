@@ -675,6 +675,7 @@
       </div>
 
       <button type="button" class="btn btn-secondary" id="exportCsvBtn" style="margin-bottom:10px;">⬇️ Exporter en CSV</button>
+      <button type="button" class="btn btn-secondary" id="exportExcelBtn" style="margin-bottom:10px;">📊 Exporter en Excel avec photos</button>
       <button type="button" class="btn btn-secondary" id="exportPdfAllBtn" style="margin-bottom:10px;">🖨️ Exporter tout en PDF</button>
       <button type="button" class="btn btn-secondary" id="exportPhotosBtn" style="margin-bottom:14px;">🖼️ Exporter les photos (.zip)</button>
 
@@ -694,6 +695,7 @@
           Nombre de demandes enregistrées : <strong id="countInfo">0</strong>
         </p>
         <button type="button" class="btn btn-secondary" id="exportCsvBtn2" style="margin-bottom:10px;">⬇️ Exporter en CSV</button>
+        <button type="button" class="btn btn-secondary" id="exportExcelBtn2" style="margin-bottom:10px;">📊 Exporter en Excel avec photos</button>
         <button type="button" class="btn btn-secondary" id="exportPdfAllBtn2" style="margin-bottom:10px;">🖨️ Exporter tout en PDF</button>
         <button type="button" class="btn btn-secondary" id="exportPhotosBtn2" style="margin-bottom:14px;">🖼️ Exporter les photos (.zip)</button>
         <button type="button" class="btn btn-danger" id="resetAllBtn" style="margin-top:2px;">🗑️ Réinitialiser toutes les données</button>
@@ -1482,9 +1484,34 @@
     return bytes;
   }
   function strToBytes(str){
-    var bytes = new Uint8Array(str.length);
-    for(var i=0; i<str.length; i++) bytes[i] = str.charCodeAt(i) & 0xFF;
-    return bytes;
+    // Encodage UTF-8 correct (nécessaire pour les caractères accentués français
+    // dans les noms de fichiers et le contenu XML des exports Excel/ZIP).
+    var bytes = [];
+    for(var i=0; i<str.length; i++){
+      var code = str.charCodeAt(i);
+      if(code < 0x80){
+        bytes.push(code);
+      }else if(code < 0x800){
+        bytes.push(0xC0 | (code >> 6), 0x80 | (code & 0x3F));
+      }else if(code >= 0xD800 && code <= 0xDBFF && i + 1 < str.length){
+        var next = str.charCodeAt(i + 1);
+        if(next >= 0xDC00 && next <= 0xDFFF){
+          var cp = 0x10000 + ((code - 0xD800) << 10) + (next - 0xDC00);
+          bytes.push(
+            0xF0 | (cp >> 18),
+            0x80 | ((cp >> 12) & 0x3F),
+            0x80 | ((cp >> 6) & 0x3F),
+            0x80 | (cp & 0x3F)
+          );
+          i++;
+        }else{
+          bytes.push(0xE0 | (code >> 12), 0x80 | ((code >> 6) & 0x3F), 0x80 | (code & 0x3F));
+        }
+      }else{
+        bytes.push(0xE0 | (code >> 12), 0x80 | ((code >> 6) & 0x3F), 0x80 | (code & 0x3F));
+      }
+    }
+    return new Uint8Array(bytes);
   }
   function dosDateTime(){
     var d = new Date();
@@ -1507,7 +1534,7 @@
       var local = new DataView(new ArrayBuffer(30));
       local.setUint32(0, 0x04034b50, true);
       local.setUint16(4, 20, true);
-      local.setUint16(6, 0, true);
+      local.setUint16(6, 0x0800, true); // bit 11 = noms de fichiers encodés en UTF-8
       local.setUint16(8, 0, true);
       local.setUint16(10, dt.time, true);
       local.setUint16(12, dt.date, true);
@@ -1523,7 +1550,7 @@
       central.setUint32(0, 0x02014b50, true);
       central.setUint16(4, 20, true);
       central.setUint16(6, 20, true);
-      central.setUint16(8, 0, true);
+      central.setUint16(8, 0x0800, true); // bit 11 = noms de fichiers encodés en UTF-8
       central.setUint16(10, 0, true);
       central.setUint16(12, dt.time, true);
       central.setUint16(14, dt.date, true);
@@ -1602,6 +1629,228 @@
     }
   }
 
+  /* ================= Export Excel (.xlsx) avec photos =================
+     Génère un vrai fichier .xlsx (format OOXML = un zip de fichiers XML),
+     avec un onglet "Demandes" (données, comme le CSV) et un onglet
+     "Photos" où chaque photo est réellement incrustée dans la cellule
+     (pas juste un nom de fichier). Construit avec buildZip() ci-dessus,
+     sans aucune librairie externe. */
+
+  function xmlEscape(s){
+    return String(s === undefined || s === null ? "" : s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+  }
+  function colLetter(colIndexZeroBased){
+    var letters = "", n = colIndexZeroBased + 1;
+    while(n > 0){
+      var rem = (n - 1) % 26;
+      letters = String.fromCharCode(65 + rem) + letters;
+      n = Math.floor((n - 1) / 26);
+    }
+    return letters;
+  }
+  function xlsxCell(colIdx, rowNum, text){
+    return '<c r="' + colLetter(colIdx) + rowNum + '" t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(text) + '</t></is></c>';
+  }
+  function buildDataSheetXml(headers, rows){
+    var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+    var allRows = [headers].concat(rows);
+    allRows.forEach(function(rowVals, rIdx){
+      var rowNum = rIdx + 1;
+      out += '<row r="' + rowNum + '">';
+      rowVals.forEach(function(val, cIdx){ out += xlsxCell(cIdx, rowNum, val); });
+      out += '</row>';
+    });
+    out += '</sheetData></worksheet>';
+    return out;
+  }
+  function getImageDimensions(dataUrl){
+    return new Promise(function(resolve){
+      var img = new Image();
+      img.onload = function(){ resolve({ w: img.naturalWidth || 400, h: img.naturalHeight || 400 }); };
+      img.onerror = function(){ resolve({ w: 400, h: 400 }); };
+      img.src = dataUrl;
+    });
+  }
+  function buildPhotosSheetAndDrawing(entries){
+    var PX_TO_EMU = 9525;
+    var MAX_BOX_PX = 160;
+    var headers = ["Référence", "Chantier", "Date visite", "Nom du fichier"];
+    var rowsXml = "";
+    var anchors = "";
+    var rels = "";
+
+    entries.forEach(function(p, idx){
+      var rowNum = idx + 2;
+      var scale = Math.min(1, MAX_BOX_PX / Math.max(p.w, p.h));
+      var boxW = Math.max(20, Math.round(p.w * scale));
+      var boxH = Math.max(20, Math.round(p.h * scale));
+      var rowHeightPt = Math.round(boxH * 0.75) + 6;
+
+      rowsXml += '<row r="' + rowNum + '" ht="' + rowHeightPt + '" customHeight="1">' +
+        xlsxCell(0, rowNum, p.ref) +
+        xlsxCell(1, rowNum, p.chantier) +
+        xlsxCell(2, rowNum, p.dateVisite) +
+        xlsxCell(3, rowNum, p.fileName) +
+        '</row>';
+
+      anchors += '<xdr:oneCellAnchor>' +
+        '<xdr:from><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + (rowNum - 1) + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>' +
+        '<xdr:ext cx="' + (boxW * PX_TO_EMU) + '" cy="' + (boxH * PX_TO_EMU) + '"/>' +
+        '<xdr:pic>' +
+          '<xdr:nvPicPr><xdr:cNvPr id="' + (idx + 2) + '" name="Photo' + (idx + 1) + '"/><xdr:cNvPicPr/></xdr:nvPicPr>' +
+          '<xdr:blipFill><a:blip r:embed="rId' + (idx + 1) + '"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>' +
+          '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + (boxW * PX_TO_EMU) + '" cy="' + (boxH * PX_TO_EMU) + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>' +
+        '</xdr:pic>' +
+        '<xdr:clientData/>' +
+        '</xdr:oneCellAnchor>';
+
+      rels += '<Relationship Id="rId' + (idx + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image' + (idx + 1) + '.jpeg"/>';
+    });
+
+    var drawingTag = entries.length > 0 ? '<drawing r:id="rId1"/>' : "";
+    var sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<cols><col min="1" max="1" width="22" customWidth="1"/><col min="2" max="2" width="26" customWidth="1"/><col min="3" max="3" width="14" customWidth="1"/><col min="4" max="4" width="24" customWidth="1"/><col min="5" max="5" width="24" customWidth="1"/></cols>' +
+      '<sheetData><row r="1">' + xlsxCell(0,1,headers[0]) + xlsxCell(1,1,headers[1]) + xlsxCell(2,1,headers[2]) + xlsxCell(3,1,headers[3]) + '</row>' +
+      rowsXml + '</sheetData>' + drawingTag + '</worksheet>';
+
+    var drawingXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      anchors + '</xdr:wsDr>';
+
+    var drawingRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>';
+
+    return { sheetXml: sheetXml, drawingXml: drawingXml, drawingRels: drawingRels };
+  }
+
+  var XLSX_RELS_ROOT =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+    '</Relationships>';
+
+  var XLSX_WORKBOOK =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    '<sheets><sheet name="Demandes" sheetId="1" r:id="rId1"/><sheet name="Photos" sheetId="2" r:id="rId2"/></sheets>' +
+    '</workbook>';
+
+  var XLSX_WORKBOOK_RELS =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>' +
+    '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    '</Relationships>';
+
+  var XLSX_STYLES =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="1"><fill><patternFill patternType="none"/></fill></fills>' +
+    '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>' +
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+    '</styleSheet>';
+
+  var XLSX_SHEET2_RELS =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing2.xml"/>' +
+    '</Relationships>';
+
+  function buildContentTypesXml(hasPhotos){
+    var overrides =
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+      '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
+    if(hasPhotos){
+      overrides += '<Override PartName="/xl/drawings/drawing2.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>';
+    }
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Default Extension="jpeg" ContentType="image/jpeg"/>' +
+      overrides + '</Types>';
+  }
+
+  function exportExcelWithPhotos(){
+    var list = loadDemandes();
+    if(list.length === 0){
+      alert("Aucune demande à exporter.");
+      return;
+    }
+
+    var headers1 = ["Référence","Chantier","Date visite","Demandé par (type)","Nom du demandeur","Zone concernée","Description","Niveau","Impacts","Urgent","Date limite urgence","Heure limite urgence","Motif urgence","Action autorisée","Responsable proposé","Commentaire","Statut","Nombre de photos","Créée le","Dernier changement de statut"];
+    var rows1 = list.map(function(d){
+      return [
+        d.ref, d.chantier, formatDateFr(d.dateVisite), d.demandeurType, d.nomDemandeur || "",
+        d.zone, d.description, NIVEAU_LABELS[d.niveau||"gris"], (d.impacts||[]).join(", "),
+        d.urgent ? "Oui" : "Non", formatDateFr(d.urgentDate), d.urgentHeure || "", d.urgentMotif || "",
+        d.action || "", d.responsable || "", d.commentaire || "", d.statut,
+        String(d.photos ? d.photos.length : 0), formatDateTimeFr(d.dateCreation), formatDateTimeFr(d.dateStatutChange)
+      ];
+    });
+    var sheet1Xml = buildDataSheetXml(headers1, rows1);
+
+    var photoEntries = [];
+    list.forEach(function(d){
+      (d.photos || []).forEach(function(p, idx){
+        photoEntries.push({
+          ref: d.ref, chantier: d.chantier, dateVisite: formatDateFr(d.dateVisite),
+          fileName: (idx + 1) + "_" + (p.name || "photo.jpg"), dataUrl: p.dataUrl
+        });
+      });
+    });
+
+    Promise.all(photoEntries.map(function(p){
+      return getImageDimensions(p.dataUrl).then(function(dim){ p.w = dim.w; p.h = dim.h; return p; });
+    })).then(function(entries){
+      var parts = buildPhotosSheetAndDrawing(entries);
+      var hasPhotos = entries.length > 0;
+
+      var files = [];
+      files.push({ name: "[Content_Types].xml", data: strToBytes(buildContentTypesXml(hasPhotos)) });
+      files.push({ name: "_rels/.rels", data: strToBytes(XLSX_RELS_ROOT) });
+      files.push({ name: "xl/workbook.xml", data: strToBytes(XLSX_WORKBOOK) });
+      files.push({ name: "xl/_rels/workbook.xml.rels", data: strToBytes(XLSX_WORKBOOK_RELS) });
+      files.push({ name: "xl/styles.xml", data: strToBytes(XLSX_STYLES) });
+      files.push({ name: "xl/worksheets/sheet1.xml", data: strToBytes(sheet1Xml) });
+      files.push({ name: "xl/worksheets/sheet2.xml", data: strToBytes(parts.sheetXml) });
+      if(hasPhotos){
+        files.push({ name: "xl/worksheets/_rels/sheet2.xml.rels", data: strToBytes(XLSX_SHEET2_RELS) });
+        files.push({ name: "xl/drawings/drawing2.xml", data: strToBytes(parts.drawingXml) });
+        files.push({ name: "xl/drawings/_rels/drawing2.xml.rels", data: strToBytes(parts.drawingRels) });
+        entries.forEach(function(p, idx){
+          files.push({ name: "xl/media/image" + (idx + 1) + ".jpeg", data: dataUrlToBytes(p.dataUrl) });
+        });
+      }
+
+      try{
+        var blob = buildZip(files);
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        var d2 = new Date();
+        a.href = url;
+        a.download = "rvs-demandes-photos-" + d2.getFullYear() + pad(d2.getMonth()+1,2) + pad(d2.getDate(),2) + ".xlsx";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }catch(e){
+        console.error("Erreur lors de la création du fichier Excel :", e);
+        alert("Erreur : impossible de générer le fichier Excel avec photos.");
+      }
+    });
+  }
+
   /* ================= Export CSV ================= */
   function exportCsv(){
     var list = loadDemandes();
@@ -1651,6 +1900,8 @@
   }
   document.getElementById("exportCsvBtn").addEventListener("click", exportCsv);
   document.getElementById("exportCsvBtn2").addEventListener("click", exportCsv);
+  document.getElementById("exportExcelBtn").addEventListener("click", exportExcelWithPhotos);
+  document.getElementById("exportExcelBtn2").addEventListener("click", exportExcelWithPhotos);
   document.getElementById("exportPdfAllBtn").addEventListener("click", exportAllPdf);
   document.getElementById("exportPdfAllBtn2").addEventListener("click", exportAllPdf);
   document.getElementById("exportPhotosBtn").addEventListener("click", exportPhotosZip);

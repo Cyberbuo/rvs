@@ -412,28 +412,47 @@
   /* ---------- Print sheet (hidden on screen) ---------- */
   #printSheet{display:none;}
 
+  @page{
+    size: auto;
+    margin: 15mm;
+  }
+
   @media print{
-    body *{visibility:hidden;}
-    #printSheet, #printSheet *{visibility:visible;}
+    html, body{
+      background:#fff;
+      margin:0;
+      padding:0;
+    }
+    /* On masque tout le contenu de l'app à l'impression, et on n'affiche
+       que la fiche imprimable. On utilise display:none (et non visibility:hidden)
+       pour que les éléments masqués ne réservent plus d'espace ni ne créent
+       de marges/decalages parasites, notamment à cause du header et de la
+       barre de navigation qui sont en position fixed/sticky. */
+    body > *:not(#printSheet){
+      display:none !important;
+    }
+
     #printSheet{
-      display:block;
-      position:absolute;
-      top:0;left:0;
-      width:100%;
-      padding:20px;
+      display:block !important;
+      position:static;
+      width:auto;
+      max-width:100%;
+      margin:0;
+      padding:0;
       font-family:Arial,Helvetica,sans-serif;
       color:#000;
+      background:#fff;
     }
-    #printSheet h1{font-size:1.3rem;margin-bottom:0;}
-    #printSheet .sub{color:#555;margin-top:2px;margin-bottom:14px;font-size:0.85rem;}
-    #printSheet table{width:100%;border-collapse:collapse;margin-bottom:12px;}
-    #printSheet td{padding:5px 4px;border-bottom:1px solid #ddd;font-size:0.85rem;vertical-align:top;}
+    #printSheet h1{font-size:1.3rem;margin:0 0 2px;}
+    #printSheet .sub{color:#555;margin:0 0 14px;font-size:0.85rem;}
+    #printSheet table{width:100%;border-collapse:collapse;margin-bottom:12px;table-layout:fixed;}
+    #printSheet td{padding:5px 4px;border-bottom:1px solid #ddd;font-size:0.85rem;vertical-align:top;word-wrap:break-word;}
     #printSheet td.k{font-weight:700;width:32%;}
-    #printSheet .sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:24px;}
-    #printSheet .sign-box{border:1px solid #999;border-radius:6px;height:80px;padding:6px;font-size:0.75rem;}
+    #printSheet .sign-grid{display:flex;gap:10px;margin-top:24px;}
+    #printSheet .sign-box{flex:1 1 0;border:1px solid #999;border-radius:6px;min-height:80px;padding:6px;font-size:0.75rem;}
     #printSheet .photos{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
     #printSheet .photos img{width:110px;height:110px;object-fit:cover;border:1px solid #ccc;}
-    #printSheet .sheet-block{page-break-after:always;}
+    #printSheet .sheet-block{page-break-after:always;padding:0;margin:0;}
     #printSheet .sheet-block:last-child{page-break-after:auto;}
   }
 
